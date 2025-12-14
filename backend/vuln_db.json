@@ -1,0 +1,430 @@
+{
+
+"directory_traversal": {
+  "title": "Directory Traversal / Path Traversal",
+  "for_humans": "Il est possible de demander des fichiers situés en dehors du dossier attendu en manipulant le chemin (ex : `../../../etc/passwd`). L'attaquant lit des fichiers sensibles du serveur.",
+  "for_experts": "Unsanitized path input used directly to open files leads to traversal using `..` sequences or encoded variants. Canonicalize and normalize paths, check that resolved path is inside an allowed base directory, use allowlists and avoid direct concatenation of user-supplied paths.",
+  "impact": "Exfiltration de fichiers sensibles (passwd, clés, configs), information leakage, escalade.",
+  "remediation": "Resolve canonical path and verify it is under allowed root (e.g. using os.path.realpath and checking prefix), reject `..` sequences and URL-encoded variants, whitelist filenames, store uploads outside webroot.",
+  "remediation_short": "Normaliser le chemin et vérifier qu'il reste dans le répertoire autorisé.",
+  "examples": {
+    "bad": "open('/var/www/files/' + user_path)",
+    "good": "safe_root = os.path.realpath('/var/www/files'); requested = os.path.realpath(os.path.join(safe_root, user_path)); if requested.startswith(safe_root): open(requested)"
+  }
+},
+
+
+  "x_content_type_options_missing": {
+    "title": "Missing Security Header: X-Content-Type-Options",
+    "for_humans": "Le serveur ne renvoie pas l'en-tête X-Content-Type-Options (nosniff). Sans lui, certains navigateurs peuvent 'deviner' le type MIME d’un fichier et exécuter du contenu dangereux à la place du type attendu.",
+    "for_experts": "Absence of the header 'X-Content-Type-Options: nosniff' allows MIME sniffing by browsers. If server returns incorrect or generic Content-Type, browsers may interpret resources (for example, HTML/JS) leading to execution of attacker-controlled payloads when resources were intended to be served as data.",
+    "impact": "Possibilité d'exécution de contenu inattendu (ex: HTML/JS injecté dans un fichier jugé non-exécutable), facilitant certains vecteurs XSS et exfiltration de données.",
+    "remediation": "Configurer le serveur et les réponses applicatives pour inclure l'en-tête 'X-Content-Type-Options: nosniff' sur toutes les réponses pertinentes. Vérifier les Content-Type déclarés et corriger les types erronés.",
+    "remediation_short": "Ajouter l'en-tête HTTP: X-Content-Type-Options: nosniff.",
+    "examples": {
+      "nginx": "add_header X-Content-Type-Options \"nosniff\" always;",
+      "apache": "Header set X-Content-Type-Options \"nosniff\"",
+      "express": "res.setHeader('X-Content-Type-Options', 'nosniff');"
+    }
+  },
+
+  "strict_transport_security_missing": {
+    "title": "Missing Security Header: Strict-Transport-Security (HSTS)",
+    "for_humans": "Le site n'impose pas que les visiteurs utilisent HTTPS uniquement. Sans HSTS, un attaquant peut forcer une connexion en HTTP et intercepter ou modifier les données.",
+    "for_experts": "Missing or misconfigured Strict-Transport-Security header leaves initial HTTP-to-HTTPS downgrade attacks possible and does not prevent MITM attacks on clients that haven't previously visited via HTTPS. Proper HSTS with sufficient max-age and includeSubDomains prevents subsequent HTTP requests from being made for the duration.",
+    "impact": "Downgrade attacks, man-in-the-middle, session compromise, credential interception.",
+    "remediation": "Ajouter un header HSTS robuste: 'Strict-Transport-Security: max-age=31536000; includeSubDomains; preload'. Assurer que site est correctement servi en HTTPS avant activation (no mixed content).",
+    "remediation_short": "Configurer HSTS (ex: max-age=31536000; includeSubDomains).",
+    "examples": {
+      "nginx": "add_header Strict-Transport-Security \"max-age=31536000; includeSubDomains; preload\" always;",
+      "apache": "Header always set Strict-Transport-Security \"max-age=31536000; includeSubDomains; preload\""
+    }
+  },
+
+  "content_security_policy_missing_or_weak": {
+    "title": "Missing or Weak Content-Security-Policy (CSP)",
+    "for_humans": "Le site n'empêche pas strictement l'exécution de scripts depuis des sources non fiables. Sans CSP, le navigateur ne bloque pas les scripts malveillants injectés.",
+    "for_experts": "Absence or permissive CSP allows execution of attacker-injected scripts, inline scripts, or loading resources from untrusted sources. CSP mitigates XSS by restricting script-src, style-src, frame-src, etc. A robust policy should avoid 'unsafe-inline' and limit sources.",
+    "impact": "Exposition aux XSS, clickjacking via frame-src, data exfiltration, injection de trackers externes.",
+    "remediation": "Définir un CSP adapté (report-only pour tests) : bloquer 'unsafe-inline', mettre des sources précises et utiliser nonce/hashes si nécessaire. Lancer en mode report-uri/report-to puis enforced.",
+    "remediation_short": "Créer une CSP restrictive (ex: default-src 'self'; script-src 'self' 'nonce-...').",
+    "examples": {
+      "csp_strict": "Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-...'; object-src 'none'; base-uri 'self';",
+      "nginx": "add_header Content-Security-Policy \"default-src 'self'; script-src 'self'; object-src 'none';\";"
+    }
+  },
+
+  "x_frame_options_missing": {
+    "title": "Missing Security Header: X-Frame-Options",
+    "for_humans": "Le site peut être affiché dans un cadre externe (iframe). Cela permet à un attaquant de tromper l'utilisateur (clickjacking).",
+    "for_experts": "Without X-Frame-Options or equivalent frame-ancestors CSP, pages can be framed by malicious sites, enabling UI redressing and clickjacking attacks. Use DENY or SAMEORIGIN as appropriate.",
+    "impact": "Clickjacking, fraudulent actions performed by a user, UI redress.",
+    "remediation": "Ajouter X-Frame-Options: DENY ou SAMEORIGIN selon besoin, ou gérer via Content-Security-Policy frame-ancestors directive.",
+    "remediation_short": "Ajouter X-Frame-Options: DENY ou SAMEORIGIN.",
+    "examples": {
+      "nginx": "add_header X-Frame-Options \"DENY\" always;",
+      "apache": "Header always set X-Frame-Options \"DENY\""
+    }
+  },
+
+  "reflected_xss": {
+    "title": "Reflected Cross-Site Scripting (Reflected XSS)",
+    "for_humans": "Une entrée fournie par l'utilisateur est renvoyée dans la page sans être filtrée, ce qui permet à un attaquant d'exécuter du JavaScript dans le navigateur d'une victime.",
+    "for_experts": "Unvalidated user input reflected in server responses allows injection of script that executes in victim's browser context. Vector often via query parameters, error messages, or scriptable fields. Requires output encoding and contextual escaping.",
+    "impact": "Vol de cookies/session, redirections malveillantes, actions effectuées au nom d’un utilisateur.",
+    "remediation": "Encoder/échapper correctement les sorties (HTML, JS, CSS), utiliser des templates sécurisés, et appliquer CSP comme mitigation supplémentaire.",
+    "remediation_short": "Échapper/encoder côté serveur (ex: HTML escape) et utiliser CSP.",
+    "examples": {
+      "bad": "<div>" ,
+      "good": "Escaping: &lt;script&gt; ... &lt;/script&gt;"
+    }
+  },
+
+  "stored_xss": {
+    "title": "Stored Cross-Site Scripting (Stored XSS)",
+    "for_humans": "L'attaquant enregistre du code malveillant sur le serveur (ex: commentaire, profil) qui s'exécute pour tous les visiteurs.",
+    "for_experts": "Persistent XSS arises when user-supplied content is stored and later rendered without sanitization. Requires strong server-side sanitization, output encoding, and possibly HTML sanitizers that remove dangerous tags/attributes.",
+    "impact": "Compromission de comptes utilisateurs, propagation de malwares sur site, vol de données.",
+    "remediation": "Sanitiser puis encoder tout contenu stocké, appliquer politique CSP, et limiter où HTML est autorisé.",
+    "remediation_short": "Sanitiser & encoder les données stockées ; appliquer CSP.",
+    "examples": {
+      "bad": "User comment contains <script>alert(1)</script>",
+      "good": "Store sanitized HTML or plain text and escape on render"
+    }
+  },
+
+  "sql_injection": {
+    "title": "SQL Injection",
+    "for_humans": "Des données entrées par l'utilisateur sont utilisées dans une requête SQL sans protection, permettant d'accéder ou modifier la base de données.",
+    "for_experts": "Concatenation-based SQL queries permit injection via payloads like ' OR 1=1 --. Use prepared statements/parameterized queries, ORM, and input validation. Also watch for second-order injections and blind SQLi.",
+    "impact": "Exfiltration/modification/suppression de données, compromis de la base ou escalation.",
+    "remediation": "Utiliser requêtes préparées, ORM avec binding de paramètres, validation stricte et principe du moindre privilège pour DB accounts.",
+    "remediation_short": "Utiliser requêtes paramétrées (prepared statements) ou ORM.",
+    "examples": {
+      "bad": "SELECT * FROM users WHERE username = '" ,
+      "good": "db.query('SELECT * FROM users WHERE username = ?', [username])"
+    }
+  },
+
+  "nosql_injection": {
+    "title": "NoSQL Injection",
+    "for_humans": "Des entrées utilisateurs manipulées modifient les requêtes vers une base NoSQL (ex: MongoDB), provoquant accès non autorisé ou fuite de données.",
+    "for_experts": "NoSQL endpoints that accept JSON objects without validation can be manipulated to change query semantics (e.g., passing {$ne: null} or operator injection). Validate/whitelist fields and types, do not merge raw user JSON into queries.",
+    "impact": "Accès/altération de données, bypass d'authentification.",
+    "remediation": "Valider le schéma d'entrée (JSON schema), éviter d'exécuter des objets fournis par l'utilisateur directement comme filtres.",
+    "remediation_short": "Valider/normaliser les données avant usage dans requêtes NoSQL.",
+    "examples": {
+      "bad": "{ \"username\": { \"$ne\": null } }",
+      "good": "{ \"username\": \"alice\" } (validated)"
+    }
+  },
+
+  "command_injection": {
+    "title": "Command Injection",
+    "for_humans": "Des données venant de l'utilisateur sont passées directement à des commandes système, permettant l'exécution de commandes arbitraires.",
+    "for_experts": "Shelling out with unsanitized user input (e.g., os.system or concatenated shell commands) risks command injection. Use safe APIs, avoid shells, or strictly validate input and use argument lists.",
+    "impact": "Exécution de commandes, compromission complète du serveur, exfiltration de données.",
+    "remediation": "Utiliser des bibliothèques qui n'appellent pas le shell (subprocess.run with list), valider et restreindre les entrées, appliquer least privilege.",
+    "remediation_short": "Éviter les appels shell ; utiliser des API sécurisées et valider l'entrée.",
+    "examples": {
+      "bad": "os.system('ping ')",
+      "good": "subprocess.run(['ping', ip])"
+    }
+  },
+
+  "remote_code_execution_rce": {
+    "title": "Remote Code Execution (RCE)",
+    "for_humans": "Un attaquant peut exécuter du code arbitraire sur ton serveur à distance.",
+    "for_experts": "RCE can be caused by deserialization flaws, command injection, unsafe eval, or vulnerable native libraries. Mitigations: avoid eval, keep dependencies patched, restrict deserialization boundaries, use sandboxing.",
+    "impact": "Total compromise of host, data exfiltration, persistence, pivoting.",
+    "remediation": "Corriger la vulnérabilité source, patch libs, limiter privilèges, monitor/process isolation and WAF rules.",
+    "remediation_short": "Patch, éliminer eval/unsafe deserialization et appliquer isolation.",
+    "examples": {
+      "bad": "Using eval() on user input",
+      "good": "Avoid eval; use explicit parsing & whitelisting"
+    }
+  },
+
+  "insecure_deserialization": {
+    "title": "Insecure Deserialization",
+    "for_humans": "Des objets ou données sérialisés fournis par un utilisateur sont réinterprétés sans contrôle, permettant l'exécution de code malveillant.",
+    "for_experts": "Deserializing untrusted data may lead to object injection and code execution. Use safe formats (JSON), validate types, use signature or encryption to ensure integrity, avoid native language deserializers for untrusted data.",
+    "impact": "RCE, privilege escalation, data tampering.",
+    "remediation": "Ne pas désérialiser de données non signées ; utiliser formats simples et valider strictement le schéma.",
+    "remediation_short": "Valider et signer les objets sérialisés ; éviter les désérialisations non fiables."
+  },
+
+  "broken_authentication": {
+    "title": "Broken Authentication",
+    "for_humans": "Les mécanismes d'authentification (mots de passe, sessions, tokens) sont faibles ou mal configurés, permettant à un attaquant de se faire passer pour un utilisateur.",
+    "for_experts": "Weak password policies, missing brute-force protections, insecure password storage (no hashing/salt), predictable tokens, and session fixation lead to authentication bypass.",
+    "impact": "Account takeover, data access, privilege escalation.",
+    "remediation": "Enforce strong password policies, use bcrypt/argon2, implement rate-limiting, MFA, secure session handling and token revocation.",
+    "remediation_short": "Utiliser hashing sécurisé (bcrypt/argon2), MFA et rate-limiting."
+  },
+
+  "broken_access_control": {
+    "title": "Broken Access Control",
+    "for_humans": "Les utilisateurs peuvent accéder à des parties du système qu'ils ne devraient pas (par ex. comptes d'autres personnes, fonctions admin).",
+    "for_experts": "Authorization checks only on client-side, predictable URLs, or missing server-side checks allow IDOR or horizontal/vertical privilege escalation. Implement server-side enforcement and least privilege.",
+    "impact": "Data leakage, unauthorized actions, privilege escalation.",
+    "remediation": "Vérifier l'autorisation côté serveur pour chaque action, appliquer RBAC/ABAC et principles of least privilege.",
+    "remediation_short": "Ajouter contrôles d'accès serveur stricts et validation de propriétaire."
+  },
+
+  "insecure_direct_object_references_idor": {
+    "title": "Insecure Direct Object Reference (IDOR)",
+    "for_humans": "Des identifiants internes (IDs) sont exposés et modifiables, permettant d'accéder aux données d'autres utilisateurs.",
+    "for_experts": "Exposing direct references (numeric IDs, file names) without proper authorization checks allows attackers to enumerate and access resources. Use indirect references or validate ownership.",
+    "impact": "Exfiltration de données, privacy violations.",
+    "remediation": "Implement object-level authorization, use opaque references, validate user ownership for each resource.",
+    "remediation_short": "Valider l'accès serveur pour chaque objet ; utiliser références opaques."
+  },
+
+  "open_redirect": {
+    "title": "Open Redirect",
+    "for_humans": "Le site redirige vers une URL fournie par l'utilisateur sans validation, ce qui peut être utilisé pour phishing.",
+    "for_experts": "Redirects that accept unvalidated 'next' or 'return' parameters allow an attacker to send users to malicious domains while appearing legitimate.",
+    "impact": "Phishing, credential theft, user redirection to malware.",
+    "remediation": "Whitelist allowed redirect domains or use relative paths; validate target URLs server-side.",
+    "remediation_short": "Valider/whitelist les URLs de redirection.",
+    "examples": {
+      "bad": "redirect(request.args.get('next'))",
+      "good": "if next in whitelist: redirect(next)"
+    }
+  },
+
+  "sensitive_data_exposure": {
+    "title": "Sensitive Data Exposure",
+    "for_humans": "Des informations sensibles (mots de passe, clés, données personnelles) sont exposées par erreur.",
+    "for_experts": "Inadequate encryption at rest or in transit, verbose error messages, or leaking secrets in code/config lead to data exposure. Use TLS, strong encryption, and avoid exposing stack traces in production.",
+    "impact": "Privacy breach, compliance violations, identity theft.",
+    "remediation": "Encrypt data in transit (TLS) and at rest, rotate keys, limit logging of secrets, apply proper access controls.",
+    "remediation_short": "Chiffrer les données et éviter les fuites d'erreurs en prod."
+  },
+
+  "insecure_cookies": {
+    "title": "Insecure Cookie Attributes (Missing Secure/HttpOnly/SameSite)",
+    "for_humans": "Les cookies ne sont pas protégés correctement (par ex. pas HttpOnly), ce qui facilite le vol de session.",
+    "for_experts": "Missing HttpOnly allows JavaScript to read cookies (XSS risk); missing Secure sends cookie over HTTP; missing SameSite permits CSRF via cross-site requests. Apply appropriate attributes.",
+    "impact": "Session theft, CSRF exploitation, credential leakage.",
+    "remediation": "Set HttpOnly, Secure, and SameSite attributes appropriately; use short TTL and rotate session identifiers.",
+    "remediation_short": "Configurer cookies avec HttpOnly, Secure et SameSite.",
+    "examples": {
+      "express": "res.cookie('sid', token, { httpOnly: true, secure: true, sameSite: 'Lax' })"
+    }
+  },
+
+  "cors_misconfiguration": {
+    "title": "CORS Misconfiguration",
+    "for_humans": "Le site permet à des sites externes non autorisés d'accéder à ses ressources en contournant les protections.",
+    "for_experts": "Using wildcard origins '*', reflecting Origin header blindly, or misconfiguring preflight responses can allow cross-origin data leaks. Restrict origins, validate Origin header, and avoid credentials with wildcard.",
+    "impact": "Data exfiltration to malicious origins, unauthorized cross-site requests.",
+    "remediation": "Whitelist specific origins, do not use '*' with credentials, validate Origin server-side.",
+    "remediation_short": "Configurer CORS avec une whitelist d'origines fiables."
+  },
+
+  "directory_listing_enabled": {
+    "title": "Directory Listing Enabled",
+    "for_humans": "Les répertoires publics renvoient la liste des fichiers, exposant potentiellement des fichiers sensibles.",
+    "for_experts": "Autoindexing (directory listing) reveals file names, backups, logs or configuration files that help an attacker. Disable directory listing in server config and ensure sensitive files are not web-accessible.",
+    "impact": "Information disclosure, easier targeted attacks.",
+    "remediation": "Disable autoindex and protect sensitive directories with proper permissions; remove backup files from webroot.",
+    "remediation_short": "Désactiver autoindex et retirer fichiers sensibles du webroot.",
+    "examples": {
+      "nginx": "autoindex off;"
+    }
+  },
+
+  "server_banner_disclosure": {
+    "title": "Server Banner / Version Disclosure",
+    "for_humans": "Le serveur révèle sa version (Apache, Nginx, framework) ce qui facilite le ciblage d'exploits connus.",
+    "for_experts": "Detailed server banners and X-Powered-By headers leak software versions and modules, enabling attackers to search for known CVEs. Remove or mask server headers and keep components patched.",
+    "impact": "Attacker reconnaissance, targeted exploitation using known vulnerabilities.",
+    "remediation": "Remove/modify server headers, disable X-Powered-By, and maintain patching processes.",
+    "remediation_short": "Masquer les bannières et garder les composants à jour."
+  },
+
+  "misconfigured_ssl_tls": {
+    "title": "Weak or Misconfigured TLS/SSL",
+    "for_humans": "Le chiffrement de la connexion est trop vieux ou mal configuré, laissant la connexion vulnérable.",
+    "for_experts": "Support for TLS 1.0/1.1, weak ciphers, or missing OCSP stapling exposes to downgrade and MITM attacks. Use modern TLS (1.2/1.3), disable weak ciphers, enable forward secrecy.",
+    "impact": "Interception of traffic, session compromise, credential leakage.",
+    "remediation": "Disable old TLS versions/ciphers, enable strong cipher suites and perfect forward secrecy (ECDHE), and configure certificates properly.",
+    "remediation_short": "Forcer TLS 1.2+/ciphers modernes, activer PFS.",
+    "examples": {
+      "nginx": "ssl_protocols TLSv1.2 TLSv1.3; ssl_prefer_server_ciphers on;"
+    }
+  },
+
+  "insecure_file_upload": {
+    "title": "Insecure File Upload",
+    "for_humans": "Le système permet d'uploader des fichiers sans vérification, permettant d'uploader des exécutables ou des scripts malveillants.",
+    "for_experts": "Allowing arbitrary file uploads without content-type validation, extension checks, or storage isolation can lead to webshells and remote code execution. Validate file type, scan content, store outside webroot, and set correct permissions.",
+    "impact": "Webshells, RCE, data exfiltration.",
+    "remediation": "Validate MIME and file signatures, limit allowed extensions, store uploads outside webroot and rename files, scan with antivirus, set proper permissions.",
+    "remediation_short": "Valider les uploads, stocker hors webroot et scanner."
+  },
+
+  "insecure_direct_object_reference_filepath": {
+    "title": "Path Traversal / Insecure File Access",
+    "for_humans": "Le système autorise l'accès à des fichiers en dehors du répertoire prévu en manipulant le chemin (ex: ../../etc/passwd).",
+    "for_experts": "Failure to sanitize path inputs or resolve canonical paths allows directory traversal attacks. Normalize and restrict paths, deny use of '..', and ensure file access checks are based on canonicalized paths.",
+    "impact": "Exposure of sensitive files, credential theft, system information disclosure.",
+    "remediation": "Canonicalize and validate paths, use allowlist of files/directories, ensure least privilege for file access.",
+    "remediation_short": "Normaliser/valider les chemins et restreindre l'accès aux fichiers."
+  },
+
+  "insufficient_logging_monitoring": {
+    "title": "Insufficient Logging & Monitoring",
+    "for_humans": "Les activités malveillantes ne sont pas correctement détectées car les logs sont incomplets ou non surveillés.",
+    "for_experts": "Lack of effective logging/monitoring delays detection and response to breaches. Ensure logs capture relevant events, are tamper-evident, aggregated centrally, and alerting is configured.",
+    "impact": "Delayed detection of breaches and longer dwell time for attackers.",
+    "remediation": "Implement centralized logging (SIEM), define alerting thresholds, retain logs, and perform regular reviews.",
+    "remediation_short": "Activer logging centralisé et alertes."
+  },
+
+  "insecure_dependencies_outdated": {
+    "title": "Using Outdated or Vulnerable Components",
+    "for_humans": "Le site utilise des bibliothèques ou serveurs avec des failles connues qui n'ont pas été corrigées.",
+    "for_experts": "Outdated frameworks & libs (with known CVEs) increase attack surface. Use SBOM, dependency scanning, and timely patching processes.",
+    "impact": "Exploitation through known vulnerabilities, supply-chain attacks.",
+    "remediation": "Regularly scan dependencies, apply patches, enforce version policies and use vulnerability scanning in CI/CD.",
+    "remediation_short": "Scanner et patcher régulièrement les dépendances."
+  },
+
+  "insufficient_transport_encryption_for_api": {
+    "title": "Insecure API Transport (No TLS or Weak TLS)",
+    "for_humans": "Les API échangent des données sans chiffrement fort, exposant les informations en transit.",
+    "for_experts": "APIs served over HTTP or using weak TLS permit sniffing and manipulation. Enforce TLS, HSTS, and mutual TLS where appropriate, and avoid insecure ciphers.",
+    "impact": "Credential and data interception, replay or manipulation.",
+    "remediation": "Forcer TLS (HTTPS) pour toutes les APIs, retire HTTP endpoints, and implement secure TLS configuration.",
+    "remediation_short": "Forcer HTTPS et configurer TLS sécurisé."
+  },
+
+  "weak_password_policy": {
+    "title": "Weak Password Policy",
+    "for_humans": "Les règles de mots de passe sont trop faibles (longueur courte, pas d'exigences), facilitant le piratage de comptes.",
+    "for_experts": "Allowing weak passwords increases brute-force success and credential stuffing impact. Enforce minimum length, complexity, password blacklist and hashing storage with salts and slow algorithms.",
+    "impact": "Account compromise, credential stuffing success.",
+    "remediation": "Require stronger passwords, MFA, rate-limiting, and secure storage with bcrypt/argon2.",
+    "remediation_short": "Imposer mots de passe robustes + MFA."
+  },
+
+  "exposed_api_keys_secrets": {
+    "title": "Exposed API Keys or Secrets",
+    "for_humans": "Des clés, tokens ou secrets apparaissent dans le code, les logs ou les fichiers publics et peuvent être utilisés par un attaquant.",
+    "for_experts": "Hard-coded secrets, leaked tokens in repos or logs allow attackers to access systems. Use secret management, env vars, rotate keys, and scan commits for secrets.",
+    "impact": "Unauthorized access to services, data leakage.",
+    "remediation": "Use secret vaults, do not store secrets in repos, rotate compromised keys, and scan for secrets in CI.",
+    "remediation_short": "Retirer secrets du code et utiliser un gestionnaire de secrets."
+  },
+
+  "multipart_parsing_bypass": {
+    "title": "Multipart/Form-Data Parsing Vulnerabilities",
+    "for_humans": "Les fichiers envoyés via formulaires peuvent tromper l'application si le parsing est mal fait, permettant d'uploader ou d'exposer des fichiers.",
+    "for_experts": "Improper handling of multipart/form-data can lead to boundary parsing issues, uploaded files being interpreted incorrectly, or path traversal. Use robust parsers and validate sizes/types.",
+    "impact": "File disclosure, upload of malicious files.",
+    "remediation": "Use trusted libraries for parsing, validate content-length and types, and sanitize filenames.",
+    "remediation_short": "Valider et parser correctement les uploads multipart."
+  },
+
+  "missing_rate_limiting": {
+    "title": "Missing Rate Limiting / Brute Force Protections",
+    "for_humans": "L'API ou formulaire accepte un grand nombre de requêtes sans bloquer, permettant aux attaquants d'essayer des mots de passe ou d'épuiser des ressources.",
+    "for_experts": "Absence of throttling allows credential stuffing, brute force, and resource exhaustion attacks. Implement IP/user throttling, exponential backoff, and CAPTCHA where appropriate.",
+    "impact": "Account takeovers, DoS, resource abuse.",
+    "remediation": "Implement rate-limiting at application or gateway level, detect brute-force patterns and block.",
+    "remediation_short": "Ajouter rate-limiting et protections anti-brute-force."
+  },
+
+  "improper_error_handling": {
+    "title": "Verbose Error Messages / Improper Error Handling",
+    "for_humans": "Les messages d'erreur montrent des détails techniques (ex: chemins, stack traces) qui aident l'attaquant.",
+    "for_experts": "Detailed server errors expose implementation details, internal paths, DB queries or library versions. Use generic errors in production and log full details server-side.",
+    "impact": "Easier reconnaissance and exploitation by attackers.",
+    "remediation": "Return user-friendly errors and log detailed traces only to secure logs.",
+    "remediation_short": "Masquer les détails techniques dans les erreurs publiques."
+  },
+
+  "insufficient_input_validation": {
+    "title": "Insufficient Input Validation",
+    "for_humans": "Le système n'enforce pas de contrôles sur ce que les utilisateurs envoient (types, tailles, contenu), ouvrant la porte aux injections et débordements.",
+    "for_experts": "Lack of input validation enables multiple classes of injection (XSS, SQLi, Command Injection) and buffer issues. Apply validation (type, length, pattern, whitelist) and output encoding.",
+    "impact": "Injections, RCE, data corruption.",
+    "remediation": "Validate and normalize input using whitelists and schemas (JSON Schema), reject unexpected fields.",
+    "remediation_short": "Valider entrées avec whitelist/schemas."
+  },
+
+  "missing_content_security_policy_report_only": {
+    "title": "CSP Report-Only Not Configured",
+    "for_humans": "Le site ne teste pas les politiques CSP avant de les appliquer ce qui peut provoquer des erreurs de blocage s'il y a des ressources non conformes.",
+    "for_experts": "Using report-only mode allows safe roll-out of CSP and collecting violations. Absence of reporting prevents understanding of breakages or missed violations.",
+    "impact": "Potential misconfiguration unnoticed, incomplete mitigation of XSS.",
+    "remediation": "Deploy CSP in report-only first and analyze reports to refine policy before enforcing.",
+    "remediation_short": "Activer CSP en report-only et analyser rapports."
+  },
+
+  "clickjacking_possible": {
+    "title": "Clickjacking Risk (lack of frame protections)",
+    "for_humans": "Une interface peut être manipulée par un attaquant en l'affichant dans une page externe et en trompant l'utilisateur.",
+    "for_experts": "No frame-ancestors or X-Frame-Options allow page embedding. Use DENY/SAMEORIGIN or frame-ancestors CSP to prevent embedding.",
+    "impact": "User actions tricked to perform unwanted operations.",
+    "remediation": "Configure X-Frame-Options or CSP frame-ancestors to prevent framing.",
+    "remediation_short": "Configurer X-Frame-Options or CSP frame-ancestors."
+  },
+
+  "unvalidated_redirects": {
+    "title": "Unvalidated Redirects and Forwards",
+    "for_humans": "Le site redirige vers des URLs fournies sans vérification, utile aux attaques de phishing.",
+    "for_experts": "Using unvalidated redirect parameters (next, returnUrl) enables phishing and open-redirect chains. Use a whitelist or relative redirect enforcement.",
+    "impact": "Phishing and user redirection to malicious sites.",
+    "remediation": "Implement whitelist of allowed redirect destinations and validate server-side.",
+    "remediation_short": "Valider/whitelist les cibles de redirection."
+  },
+
+  "insufficient_session_expiration": {
+    "title": "Insufficient Session Expiration",
+    "for_humans": "Les sessions restent valides trop longtemps, augmentant la fenêtre d'attaque si un cookie est volé.",
+    "for_experts": "Long-lived sessions increase risk; implement reasonable TTLs, idle timeouts, re-auth for sensitive actions and automated invalidation on logout.",
+    "impact": "Prolonged account compromise if session tokens leaked.",
+    "remediation": "Shorten session TTLs, use rotating tokens, invalidate on logout/credential change.",
+    "remediation_short": "Réduire la durée de session et forcer re-auth."
+  },
+
+  "sensitive_information_in_url": {
+    "title": "Sensitive Information in URL (Query Strings)",
+    "for_humans": "Des données sensibles (tokens, identifiants) apparaissent dans l'URL, exposées dans logs et référents.",
+    "for_experts": "Sensitive data in URLs can leak via referrers, logs, and browser history. Use POST body, secure cookies, or short-lived tokens in headers.",
+    "impact": "Token leakage, credential exposure.",
+    "remediation": "Avoid placing secrets in URLs; use secure headers or POST with body.",
+    "remediation_short": "Ne pas mettre de secrets dans les URLs."
+  },
+
+  "improper_authorization_checks_on_api": {
+    "title": "Improper Authorization Checks on APIs",
+    "for_humans": "Certaines actions ne vérifient pas si l'utilisateur est autorisé, permettant d'effectuer des actions interdites.",
+    "for_experts": "APIs missing object-level authorization and relying on client-side controls allow privilege escalation and data access. Perform server-side checks for each request and action.",
+    "impact": "Unauthorized data access, escalation of privileges.",
+    "remediation": "Enforce server-side RBAC/ABAC and owner checks per endpoint.",
+    "remediation_short": "Vérifier l'autorisation côté serveur pour chaque requête."
+  },
+
+  "weak_or_no_sanitization_of_html": {
+    "title": "Weak or No Sanitization of HTML Inputs",
+    "for_humans": "Les champs acceptant du HTML ne sont pas nettoyés et peuvent contenir des scripts dangereux.",
+    "for_experts": "Allowing raw HTML without a sanitizer leads to stored XSS; use robust HTML sanitizer libraries, whitelist tags/attributes, and encode on output.",
+    "impact": "Stored XSS, site compromise.",
+    "remediation": "Sanitize HTML inputs with a vetted library and apply CSP.",
+    "remediation_short": "Sanitiser l'HTML avec une librairie sûre."
+  },
+
+  "insufficient_csp_for_third_party_scripts": {
+    "title": "Third-Party Scripts Not Properly Scoped",
+    "for_humans": "Les scripts tiers (analytics, widgets) peuvent exécuter du code dangereux s'ils sont compromis.",
+    "for_experts": "Third-party scripts run in page context and can exfiltrate data or pivot to attack. Use subresource integrity (SRI), CSP to restrict sources, and load from trusted endpoints.",
+    "impact": "Supply-chain attacks, data exfiltration via third-party scripts.",
+    "remediation": "Use SRI, CSP, and minimize third-party script usage; serve critical scripts from controlled infrastructure.",
+    "remediation_short": "Limiter et protéger les scripts tiers (SRI + CSP)."
+  }
+}
