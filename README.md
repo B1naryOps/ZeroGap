@@ -1,6 +1,3 @@
-Voici le fichier `README.md` complet et mis à jour avec la section **Équipe Projet**. Vous pouvez tout copier-coller.
-
-```markdown
 # 🛡️ ZeroGap - Scanner de Vulnérabilités Web (v2.0)
 
 **ZeroGap** est un outil d'audit de sécurité web moderne combinant un backend performant en **Python (Flask)** et une interface utilisateur intuitive en **React.js**. Il permet d'analyser des sites web pour détecter des vulnérabilités critiques, vérifier la configuration serveur et générer des rapports détaillés pour les auditeurs et développeurs.
