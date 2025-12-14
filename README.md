@@ -1,3 +1,6 @@
+Voici le fichier `README.md` complet et mis à jour avec la section **Équipe Projet**. Vous pouvez tout copier-coller.
+
+```markdown
 # 🛡️ ZeroGap - Scanner de Vulnérabilités Web (v2.0)
 
 **ZeroGap** est un outil d'audit de sécurité web moderne combinant un backend performant en **Python (Flask)** et une interface utilisateur intuitive en **React.js**. Il permet d'analyser des sites web pour détecter des vulnérabilités critiques, vérifier la configuration serveur et générer des rapports détaillés pour les auditeurs et développeurs.
@@ -53,7 +56,7 @@ Avant de commencer, assurez-vous d'avoir installé les outils suivants :
 Ouvrez un terminal (ou l'invite de commande) et récupérez le code source :
 
 ```bash
-git clone https://github.com/B1naryOps/ZeroGap.git
+git clone https://github.com/VOTRE_USERNAME/ZeroGap.git
 cd ZeroGap
 ```
 *(Remplacez l'URL par le lien de votre dépôt si vous l'avez hébergé)*
@@ -150,9 +153,19 @@ ZeroGap/
 
 **L'utilisation de ce scanner de vulnérabilités doit se faire uniquement sur des systèmes que vous possédez ou pour lesquels vous avez une autorisation écrite explicite.**
 
-L'auteur décline toute responsabilité en cas de dommages causés ou de mauvaise utilisation de cet outil. L'utilisation de scanners de sécurité sur des cibles non autorisées est illégale et passible de poursuites pénales.
+Les auteurs déclinent toute responsabilité en cas de dommages causés ou de mauvaise utilisation de cet outil. L'utilisation de scanners de sécurité sur des cibles non autorisées est illégale et passible de poursuites pénales.
 
 Utilisez **ZeroGap** pour sécuriser vos propres applications ou dans des environnements de test dédiés (ex: DVWA, bWAPP, localhost).
+
+---
+
+## 👥 Équipe Projet
+
+Ce projet a été conçu et réalisé par une équipe d'ingénieurs en cybersécurité en formation :
+
+*   **BARIKI Yendouparou Wilson (CG)** - *Ingénieur Cybersécurité en Formation*
+*   **ABAKTA Haana Camille** - *Ingénieur Cybersécurité en Formation*
+*   **MALOU Essozimna Wilfried** - *Ingénieur Cybersécurité en Formation*
 
 ---
 
@@ -165,7 +178,7 @@ Utilisez **ZeroGap** pour sécuriser vos propres applications ou dans des enviro
 
 ---
 
-## 🤝 Crédits
+## 🤝 Crédits Techniques
 
 Projet développé avec :
 *   [Flask](https://flask.palletsprojects.com/)
